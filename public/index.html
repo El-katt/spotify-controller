@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Groove — Spotify Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+
+</head>
+<body>
+
+<!-- Ambient bg glow -->
+<div id="ambient"></div>
+
+<!-- Auth Screen -->
+<div id="auth-screen">
+  <h1>groo<span>ve</span></h1>
+  <p>Connect your Spotify account on the host machine to let everyone on the network control music.</p>
+  <a href="/login" class="btn" style="text-decoration:none;padding:14px 32px;font-size:1rem;">
+    Connect Spotify
+  </a>
+  <p id="auth-error" class="hidden" style="color:#e05555;font-family:var(--mono);font-size:0.8rem;"></p>
+</div>
+
+<!-- Main App -->
+<div id="app" class="hidden">
+
+  <!-- ── PLAYER ─────────────────────────────────────────────────── -->
+  <div id="player-card" class="card">
+    <div class="card-title">Now Playing</div>
+
+    <div id="art-wrap">
+      <div id="art-placeholder">🎵</div>
+      <img id="art-img" src="" alt="" style="display:none"/>
+    </div>
+
+    <div id="track-info">
+      <div id="track-name">No track playing</div>
+      <div id="track-artist">—</div>
+      <div id="track-album"></div>
+    </div>
+
+    <div id="progress-wrap">
+      <div id="progress-times">
+        <span id="pos-time">0:00</span>
+        <span id="dur-time">0:00</span>
+      </div>
+      <div id="progress-bar" onclick="seekTo(event)">
+        <div id="progress-bar-fill"></div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <!-- Shuffle -->
+      <button class="ctrl-btn" id="shuffle-btn" title="Shuffle" onclick="toggleShuffle()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+      </button>
+      <!-- Prev -->
+      <button class="ctrl-btn" title="Previous" onclick="prevTrack()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <!-- Play/Pause -->
+      <button id="play-btn" title="Play/Pause" onclick="togglePlay()">
+        <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <!-- Next -->
+      <button class="ctrl-btn" title="Next" onclick="nextTrack()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <!-- Repeat -->
+      <button class="ctrl-btn" id="repeat-btn" title="Repeat" onclick="cycleRepeat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      </button>
+    </div>
+
+    <div id="volume-wrap">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5L6 9H2v6h4l5 4V5z"/></svg>
+      <input type="range" id="volume-slider" min="0" max="100" value="50" oninput="setVolume(this.value)" />
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+    </div>
+
+    <div id="device-bar" onclick="openDeviceModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span id="device-name">Loading devices…</span>
+    </div>
+  </div>
+
+  <!-- ── SEARCH ──────────────────────────────────────────────────── -->
+  <div id="search-card" class="card">
+    <div class="card-title">Search</div>
+    <div id="search-input-wrap">
+      <input id="search-input" type="text" placeholder="Search tracks, artists, albums…" onkeydown="if(event.key==='Enter')doSearch()" />
+      <button class="btn" onclick="doSearch()">Search</button>
+    </div>
+    <div id="search-results"><div class="empty-state">Start typing to search Spotify</div></div>
+  </div>
+
+  <!-- ── QUEUE ───────────────────────────────────────────────────── -->
+  <div id="queue-card" class="card">
+    <div class="card-title">Up Next</div>
+    <div id="queue-list"><div class="empty-state">Queue is empty</div></div>
+  </div>
+
+  <!-- ── LYRICS ──────────────────────────────────────────────────── -->
+  <div id="lyrics-card" class="card">
+    <div class="card-title">Lyrics</div>
+    <div id="lyrics-title"></div>
+    <div id="lyrics-body"><span class="empty-state">Play a track to see lyrics</span></div>
+  </div>
+
+</div>
+
+<!-- Device Modal -->
+<div id="device-modal" onclick="closeDeviceModal(event)">
+  <div id="device-modal-inner">
+    <h3>Choose a Device</h3>
+    <div id="device-list"></div>
+    <button class="btn secondary" style="margin-top:16px;width:100%" onclick="closeDeviceModal()">Close</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────────
+let state = {
+  playing: false,
+  progress: 0,
+  duration: 0,
+  volume: 50,
+  shuffle: false,
+  repeat: 'off',      // 'off' | 'context' | 'track'
+  trackId: null,
+  artistName: null,
+  trackName: null,
+  queue: [],
+  queueEdited: false,
+};
+
+let progressTimer = null;
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  const urlParams = new URLSearchParams(location.search);
+  if (urlParams.get('error')) showError(urlParams.get('error'));
+
+  try {
+    const r = await fetch('/auth/status').then(r => r.json());
+    if (!r.authed) return; // stay on auth screen
+
+    document.getElementById('auth-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+
+    startPolling();
+    await fetchQueue();
+  } catch (e) { /* not authed */ }
+})();
+
+function showError(err) {
+  const el = document.getElementById('auth-error');
+  el.textContent = 'Error: ' + err;
+  el.classList.remove('hidden');
+}
+
+// ── POLLING ──────────────────────────────────────────────────────────────────
+function startPolling() {
+  fetchCurrent();
+  setInterval(fetchCurrent, 3000);
+  setInterval(() => {
+    if (!state.queueEdited) fetchQueue();
+  }, 8000);
+}
+
+async function fetchCurrent() {
+  try {
+    const data = await fetch('/api/current').then(r => r.json());
+    if (data.error === 'not_authed') {
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      return;
+    }
+    updateUI(data);
+  } catch(e) {}
+}
+
+// ── UI UPDATE ─────────────────────────────────────────────────────────────────
+function updateUI(data) {
+  if (!data || !data.item) {
+    document.getElementById('track-name').textContent = 'No track playing';
+    document.getElementById('track-artist').textContent = '—';
+    document.getElementById('track-album').textContent = '';
+    document.getElementById('art-img').style.display = 'none';
+    document.getElementById('art-placeholder').style.display = 'flex';
+    document.getElementById('art-wrap').classList.remove('playing');
+    clearInterval(progressTimer);
+    return;
+  }
+
+  const { item, is_playing, progress_ms, device, shuffle_state, repeat_state } = data;
+
+  // Track changed?
+  const trackChanged = state.trackId !== item.id;
+  state.trackId    = item.id;
+  state.playing    = is_playing;
+  state.progress   = progress_ms || 0;
+  state.duration   = item.duration_ms || 1;
+  state.shuffle    = shuffle_state;
+  state.repeat     = repeat_state;
+  state.artistName = item.artists?.[0]?.name;
+  state.trackName  = item.name;
+
+  // Text
+  document.getElementById('track-name').textContent   = item.name;
+  document.getElementById('track-artist').textContent = item.artists?.map(a => a.name).join(', ') || '';
+  document.getElementById('track-album').textContent  = item.album?.name || '';
+
+  // Art
+  const imgEl = document.getElementById('art-img');
+  const imgUrl = item.album?.images?.[0]?.url;
+  if (imgUrl && imgEl.src !== imgUrl) {
+    imgEl.src = imgUrl;
+    imgEl.style.display = 'block';
+    document.getElementById('art-placeholder').style.display = 'none';
+    setAmbientColor(imgUrl);
+  }
+  document.getElementById('art-wrap').classList.toggle('playing', is_playing);
+
+  // Play/Pause icons
+  document.getElementById('play-icon').style.display  = is_playing ? 'none' : 'block';
+  document.getElementById('pause-icon').style.display = is_playing ? 'block' : 'none';
+
+  // Progress
+  updateProgress(state.progress, state.duration);
+  clearInterval(progressTimer);
+  if (is_playing) {
+    progressTimer = setInterval(() => {
+      state.progress = Math.min(state.progress + 300, state.duration);
+      updateProgress(state.progress, state.duration);
+    }, 300);
+  }
+
+  // Controls state
+  document.getElementById('shuffle-btn').classList.toggle('active', shuffle_state);
+  updateRepeatBtn(repeat_state);
+
+  // Volume
+  if (device?.volume_percent != null) {
+    state.volume = device.volume_percent;
+    document.getElementById('volume-slider').value = device.volume_percent;
+  }
+
+  // Device name
+  document.getElementById('device-name').textContent = device?.name || 'Unknown device';
+
+  // Lyrics on track change
+  if (trackChanged && state.artistName && state.trackName) {
+    fetchLyrics(state.artistName, state.trackName);
+  }
+}
+
+function updateProgress(pos, dur) {
+  const pct = dur ? (pos / dur) * 100 : 0;
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('pos-time').textContent = msToTime(pos);
+  document.getElementById('dur-time').textContent = msToTime(dur);
+}
+
+function msToTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function updateRepeatBtn(mode) {
+  const btn = document.getElementById('repeat-btn');
+  btn.classList.toggle('active', mode !== 'off');
+  btn.title = mode === 'off' ? 'Repeat: Off' : mode === 'context' ? 'Repeat: All' : 'Repeat: One';
+}
+
+// Ambient color (simple: tint from art URL hash)
+function setAmbientColor(url) {
+  // Use a green/teal hue based on Spotify brand; swap subtly per track
+  const hue = (url.length * 7) % 60 + 140; // 140–200 = green-teal range
+  document.getElementById('ambient').style.background =
+    `radial-gradient(ellipse 80% 60% at 50% -10%, hsl(${hue},60%,35%), transparent)`;
+}
+
+// ── CONTROLS ─────────────────────────────────────────────────────────────────
+async function togglePlay() {
+  if (state.playing) {
+    await fetch('/api/pause', { method: 'PUT' });
+    state.playing = false;
+    document.getElementById('play-icon').style.display  = 'block';
+    document.getElementById('pause-icon').style.display = 'none';
+    document.getElementById('art-wrap').classList.remove('playing');
+    clearInterval(progressTimer);
+  } else {
+    await fetch('/api/play', { method: 'PUT', headers:{'Content-Type':'application/json'}, body: '{}' });
+    state.playing = true;
+    document.getElementById('play-icon').style.display  = 'none';
+    document.getElementById('pause-icon').style.display = 'block';
+    document.getElementById('art-wrap').classList.add('playing');
+  }
+}
+
+async function nextTrack() {
+  await fetch('/api/next', { method: 'POST' });
+  setTimeout(fetchCurrent, 600);
+}
+
+async function prevTrack() {
+  await fetch('/api/previous', { method: 'POST' });
+  setTimeout(fetchCurrent, 600);
+}
+
+async function setVolume(v) {
+  await fetch('/api/volume', { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ volume: parseInt(v) }) });
+}
+
+async function toggleShuffle() {
+  state.shuffle = !state.shuffle;
+  await fetch('/api/shuffle', { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ state: state.shuffle }) });
+  document.getElementById('shuffle-btn').classList.toggle('active', state.shuffle);
+  toast(state.shuffle ? 'Shuffle on' : 'Shuffle off');
+}
+
+const repeatCycle = ['off', 'context', 'track'];
+async function cycleRepeat() {
+  const next = repeatCycle[(repeatCycle.indexOf(state.repeat) + 1) % 3];
+  state.repeat = next;
+  await fetch('/api/repeat', { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ state: next }) });
+  updateRepeatBtn(next);
+  toast(`Repeat: ${next === 'off' ? 'Off' : next === 'context' ? 'All' : 'One'}`);
+}
+
+function seekTo(e) {
+  const bar = document.getElementById('progress-bar');
+  const rect = bar.getBoundingClientRect();
+  const pct  = (e.clientX - rect.left) / rect.width;
+  const pos  = Math.floor(pct * state.duration);
+  state.progress = pos;
+  updateProgress(pos, state.duration);
+  fetch('/api/seek', { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ position_ms: pos }) });
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────────────────
+let searchDebounce;
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const res = document.getElementById('search-results');
+  res.innerHTML = '<div class="empty-state">Searching…</div>';
+
+  try {
+    const data = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+    const tracks = data.tracks?.items || [];
+    if (!tracks.length) { res.innerHTML = '<div class="empty-state">No results found</div>'; return; }
+
+    res.innerHTML = '';
+    tracks.forEach(track => {
+      const art = track.album?.images?.[2]?.url || track.album?.images?.[0]?.url || '';
+      const row = document.createElement('div');
+      row.className = 'track-row';
+      row.innerHTML = `
+        <img src="${art}" alt="" onerror="this.style.display='none'" />
+        <div class="tr-info">
+          <div class="tr-name">${esc(track.name)}</div>
+          <div class="tr-artist">${esc(track.artists?.[0]?.name || '')}</div>
+        </div>
+        <div class="tr-actions">
+          <button class="icon-btn" onclick="playNow('${track.uri}');event.stopPropagation()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Play
+          </button>
+          <button class="icon-btn" onclick="addToQueue('${track.uri}','${esc(track.name)}');event.stopPropagation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Queue
+          </button>
+        </div>
+      `;
+      row.addEventListener('click', () => playNow(track.uri));
+      res.appendChild(row);
+    });
+  } catch(e) {
+    res.innerHTML = '<div class="empty-state">Search failed. Try again.</div>';
+  }
+}
+
+async function playNow(uri) {
+  await fetch('/api/play', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uris: [uri] })
+  });
+  setTimeout(fetchCurrent, 800);
+  toast('Playing now');
+}
+
+async function addToQueue(uri, name) {
+  const isAlreadyQueued = state.queue.some(track => (track.uri || `spotify:track:${track.id}`) === uri);
+
+  if (!isAlreadyQueued) {
+    try {
+      const data = await fetch('/api/queue').then(r => r.json());
+      const existing = (data.queue || []).map(track => track.uri || `spotify:track:${track.id}`);
+      if (existing.includes(uri)) {
+        toast(`Already in queue: ${name}`);
+        return;
+      }
+    } catch (e) {
+      // ignore queue fetch failure and fallback to enqueue request
+    }
+  }
+
+  if (isAlreadyQueued) {
+    toast(`Already in queue: ${name}`);
+    return;
+  }
+
+  await fetch('/api/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uri })
+  });
+
+  toast(`Added to queue: ${name}`);
+  setTimeout(() => {
+    if (!state.queueEdited) {
+      fetchQueue();
+    } else {
+      state.queue.push({ uri, name, artists: [{ name: '' }], album: { images: [] } });
+      renderQueue();
+    }
+  }, 1000);
+}
+
+function renderQueue() {
+  const list = document.getElementById('queue-list');
+  const items = state.queue || [];
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state">Queue is empty</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  items.slice(0, 20).forEach((track, i) => {
+    const art = track.album?.images?.[2]?.url || track.album?.images?.[0]?.url || '';
+    const el = document.createElement('div');
+    el.className = 'queue-item';
+    const upDisabled = i === 0 ? 'disabled' : '';
+    const downDisabled = i === items.length - 1 ? 'disabled' : '';
+    el.innerHTML = `
+      <span class="queue-num">${i+1}</span>
+      <img src="${art}" alt="" onerror="this.style.display='none'" />
+      <div class="qi-info">
+        <div class="qi-name">${esc(track.name)}</div>
+        <div class="qi-artist">${esc(track.artists?.[0]?.name || '')}</div>
+      </div>
+      <div class="queue-actions">
+        <button class="queue-action-btn" onclick="moveQueueItem(${i}, -1); event.stopPropagation()" ${upDisabled}>↑</button>
+        <button class="queue-action-btn" onclick="moveQueueItem(${i}, 1); event.stopPropagation()" ${downDisabled}>↓</button>
+        <button class="queue-action-btn" onclick="removeQueueItem(${i}); event.stopPropagation()">✕</button>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function moveQueueItem(index, direction) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= state.queue.length) return;
+  [state.queue[index], state.queue[nextIndex]] = [state.queue[nextIndex], state.queue[index]];
+  state.queueEdited = true;
+  renderQueue();
+}
+
+function removeQueueItem(index) {
+  const removed = state.queue.splice(index, 1)[0];
+  state.queueEdited = true;
+  renderQueue();
+  toast(`Removed from queue: ${removed?.name || 'item'}`);
+}
+
+// ── QUEUE ────────────────────────────────────────────────────────────────────
+async function fetchQueue() {
+  try {
+    const data = await fetch('/api/queue').then(r => r.json());
+    const items = data.queue || [];
+    if (!state.queueEdited) {
+      const seen = new Set();
+      state.queue = items.filter(track => {
+        const id = track.uri || `spotify:track:${track.id}`;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    }
+    renderQueue();
+  } catch(e) {
+    renderQueue();
+  }
+}
+
+// ── LYRICS ───────────────────────────────────────────────────────────────────
+let lyricsFor = null;
+async function fetchLyrics(artist, title) {
+  const key = `${artist}::${title}`;
+  if (lyricsFor === key) return;
+  lyricsFor = key;
+
+  const body = document.getElementById('lyrics-body');
+  const titleEl = document.getElementById('lyrics-title');
+  body.className = 'loading';
+  body.textContent = 'Fetching lyrics…';
+  titleEl.textContent = '';
+
+  try {
+    const data = await fetch(`/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`).then(r => r.json());
+    body.className = '';
+    if (data.lyrics) {
+      titleEl.textContent = `${title} — ${artist}`;
+      body.textContent = data.lyrics.trim();
+    } else {
+      titleEl.textContent = '';
+      body.innerHTML = '<span class="empty-state">Lyrics not found for this track</span>';
+    }
+  } catch(e) {
+    body.className = '';
+    body.innerHTML = '<span class="empty-state">Could not load lyrics</span>';
+  }
+}
+
+// ── DEVICES ──────────────────────────────────────────────────────────────────
+async function openDeviceModal() {
+  document.getElementById('device-modal').classList.add('open');
+  const list = document.getElementById('device-list');
+  list.innerHTML = '<div class="empty-state">Loading devices…</div>';
+
+  try {
+    const data = await fetch('/api/devices').then(r => r.json());
+    const devices = data.devices || [];
+    list.innerHTML = '';
+    if (!devices.length) { list.innerHTML = '<div class="empty-state">No active devices found</div>'; return; }
+
+    devices.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'device-item' + (d.is_active ? ' active' : '');
+      el.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          ${d.type === 'Smartphone'
+            ? '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'
+            : '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'}
+        </svg>
+        <div>
+          <div class="di-name">${esc(d.name)}${d.is_active ? ' ✓' : ''}</div>
+          <div class="di-type">${d.type}</div>
+        </div>
+      `;
+      el.addEventListener('click', () => {
+        transferPlayback(d.id, d.name);
+        closeDeviceModal();
+      });
+      list.appendChild(el);
+    });
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state">Failed to load devices</div>';
+  }
+}
+
+async function transferPlayback(id, name) {
+  await fetch('/api/devices/transfer', {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ device_id: id })
+  });
+  document.getElementById('device-name').textContent = name;
+  toast(`Switched to ${name}`);
+}
+
+function closeDeviceModal(e) {
+  if (!e || e.target === document.getElementById('device-modal') || !e.target) {
+    document.getElementById('device-modal').classList.remove('open');
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── UTIL ──────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
